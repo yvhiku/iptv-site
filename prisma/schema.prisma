@@ -1,0 +1,153 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model User {
+  id                 String              @id @default(cuid())
+  name               String?
+  email              String              @unique
+  emailVerified      DateTime?           @map("email_verified")
+  image              String?
+  password           String?
+  role               UserRole            @default(USER)
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  accounts           Account[]
+  sessions           Session[]
+  subscriptions      UserSubscription[]
+  orders             Order[]
+  serviceCredentials ServiceCredentials?
+
+  @@map("users")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verificationtokens")
+}
+
+model SubscriptionPlan {
+  id               String             @id @default(cuid())
+  name             String
+  description      String?
+  durationInMonths Int
+  price            Float
+  features         String
+  isActive         Boolean            @default(true)
+  stripePriceId    String?            @unique @map("stripe_price_id")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  subscriptions    UserSubscription[]
+  orders           Order[]
+
+  @@map("subscription_plans")
+}
+
+model UserSubscription {
+  id                   String            @id @default(cuid())
+  userId               String            @map("user_id")
+  planId               String            @map("plan_id")
+  startDate            DateTime          @map("start_date")
+  endDate              DateTime          @map("end_date")
+  status               SubscriptionStatus
+  stripeSubscriptionId String?           @unique @map("stripe_subscription_id")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  user User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  @@map("user_subscriptions")
+}
+
+model Order {
+  id                    String      @id @default(cuid())
+  userId                String      @map("user_id")
+  planId                String      @map("plan_id")
+  amount                Float
+  stripePaymentIntentId String?     @unique @map("stripe_payment_intent_id")
+  stripeSessionId       String?     @unique @map("stripe_session_id")
+  status                OrderStatus
+  createdAt             DateTime    @default(now()) @map("created_at")
+  updatedAt             DateTime    @updatedAt @map("updated_at")
+
+  user User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  @@map("orders")
+}
+
+model ServiceCredentials {
+  id              String  @id @default(cuid())
+  userId          String  @unique @map("user_id")
+  m3uLink         String  @map("m3u_link")
+  xtreamUsername  String  @map("xtream_username")
+  xtreamPassword  String  @map("xtream_password")
+  portalUrl       String  @map("portal_url")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("service_credentials")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
